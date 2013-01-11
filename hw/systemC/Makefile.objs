@@ -1,0 +1,9 @@
+
+# Special rule for systemC file.
+hw/systemC/%.o: $(SRC_PATH)/hw/systemC/%.cpp
+	$(call quiet-command,$(CXX) -I$(TLM_INCLUDE)                               \
+                                -I$(SYSTEMC_INCLUDE)                           \
+                                -I$(BOOST_INCLUDE)                             \
+                                -I$(GREENSOCS_INCLUDE)                         \
+                                -DSC_INCLUDE_DYNAMIC_PROCESSES                 \
+                                -fPIC -c -o $@ $<,"  CXX   $(TARGET_DIR)$@")

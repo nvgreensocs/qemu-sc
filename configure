@@ -127,6 +127,7 @@ audio_card_list="ac97 es1370 sb16 hda"
 audio_possible_cards="ac97 es1370 sb16 cs4231a adlib gus hda"
 block_drv_whitelist=""
 host_cc="cc"
+host_cxx="c++"
 libs_softmmu=""
 libs_tools=""
 audio_pt_int=""
@@ -200,6 +201,10 @@ libexecdir="\${prefix}/libexec"
 includedir="\${prefix}/include"
 sysconfdir="\${prefix}/etc"
 local_statedir="\${prefix}/var"
+gsdir="\${prefix}"
+syscdir="\${prefix}"
+tlmdir="\${prefix}"
+boostdir="\${prefix}"
 confsuffix="/qemu"
 slirp="yes"
 fmod_lib=""
@@ -241,6 +246,8 @@ gtk=""
 gtkabi="2.0"
 tpm="no"
 libssh2=""
+# TODO: remove the yes for release.
+systemc_wrapper="yes"
 
 # parse CC options first
 for opt do
@@ -249,6 +256,8 @@ for opt do
   --cross-prefix=*) cross_prefix="$optarg"
   ;;
   --cc=*) CC="$optarg"
+  ;;
+  --cxx=*) CXX="$optarg"
   ;;
   --source-path=*) source_path="$optarg"
   ;;
@@ -278,6 +287,12 @@ if test -z "${CC}${cross_prefix}"; then
   cc="$host_cc"
 else
   cc="${CC-${cross_prefix}gcc}"
+fi
+
+if test -z "${CXX}${cross_prefix}"; then
+  cxx="$host_cxx"
+else
+  cxx="${CXX-${cross_prefix}g++}"
 fi
 
 ar="${AR-${cross_prefix}ar}"
@@ -611,7 +626,11 @@ for opt do
   ;;
   --cc=*)
   ;;
+  --cxx=*)
+  ;;
   --host-cc=*) host_cc="$optarg"
+  ;;
+  --host-cxx=*) host_cxx="$optarg"
   ;;
   --objcc=*) objcc="$optarg"
   ;;
@@ -928,10 +947,42 @@ for opt do
   ;;
   --enable-libssh2) libssh2="yes"
   ;;
+  --disable-systemc-wrapper) systemc_wrapper="no"
+  ;;
+  --enable-systemc-wrapper) systemc_wrapper="yes"
+  ;;
+  --with-greensocs=*) gsdir="$optarg"
+  ;;
+  --with-systemc=*) syscdir="$optarg"
+  ;;
+  --with-tlm=*) tlmdir="$optarg"
+  ;;
+  --with-boost=*) boostdir="$optarg"
+  ;;
   *) echo "ERROR: unknown option $opt"; show_help="yes"
   ;;
   esac
 done
+
+if [ ! -e "$gsdir/include/greencontrol" ]; then
+    echo "unable to find greensocs library. Try using --with-greensocs="
+    show_help="yes"
+fi
+
+if [ ! -e "$syscdir/include/systemc" ]; then
+    echo "unable to find systemc library. Try using --with-systemc="
+    show_help="yes"
+fi
+
+if [ ! -e "$tlmdir/include/tlm" ]; then
+    echo "unable to find tlm library. Try using --with-tlm="
+    show_help="yes"
+fi
+
+if [ ! -e "$boostdir/include/boost/version.hpp" ]; then
+    echo "unable to find boost header. Try using --with-boost="
+    show_help="yes"
+fi
 
 case "$cpu" in
     sparc)
@@ -1062,6 +1113,9 @@ echo "  --cross-prefix=PREFIX    use PREFIX for compile tools [$cross_prefix]"
 echo "  --cc=CC                  use C compiler CC [$cc]"
 echo "  --host-cc=CC             use C compiler CC [$host_cc] for code run at"
 echo "                           build time"
+echo "  --cxx=CXX                use C++ compiler CXX [$cxx]"
+echo "  --host-cxx=CXX           use C++ compiler CXX [$host_cxx] for code run"
+echo "                           at build time"
 echo "  --objcc=OBJCC            use Objective-C compiler OBJCC [$objcc]"
 echo "  --extra-cflags=CFLAGS    append extra C compiler flags QEMU_CFLAGS"
 echo "  --extra-ldflags=LDFLAGS  append extra linker flags LDFLAGS"
@@ -3568,6 +3622,11 @@ echo "seccomp support   $seccomp"
 echo "coroutine backend $coroutine"
 echo "GlusterFS support $glusterfs"
 echo "virtio-blk-data-plane $virtio_blk_data_plane"
+echo "systemc-wrapper   $systemc_wrapper"
+echo "greensocs prefix  $gsdir"
+echo "systemc prefix    $syscdir"
+echo "tlm prefix        $tlmdir"
+echo "boost prefix      $boostdir"
 echo "gcov              $gcov_tool"
 echo "gcov enabled      $gcov"
 echo "TPM support       $tpm"
@@ -3958,6 +4017,22 @@ if test "$virtio_blk_data_plane" = "yes" ; then
   echo 'CONFIG_VIRTIO_BLK_DATA_PLANE=$(CONFIG_VIRTIO)' >> $config_host_mak
 fi
 
+if test "$systemc_wrapper" = "yes" ; then
+  echo "CONFIG_SYSTEMC_WRAPPER=y" >> $config_host_mak
+  echo "GREENSOCS_INCLUDE=$gsdir/include" >> $config_host_mak
+  echo "SYSTEMC_INCLUDE=$syscdir/include" >> $config_host_mak
+  if [ ! -e $syscdir/lib-linux/libsystemc.a ]; then
+    echo "SYSTEMC_LIB=$syscdir/lib-linux64" >> $config_host_mak
+  else
+    echo "SYSTEMC_LIB=$syscdir/lib-linux" >> $config_host_mak
+  fi
+  echo "TLM_INCLUDE=$tlmdir/include/tlm" >> $config_host_mak
+  echo "BOOST_INCLUDE=$boostdir/include" >> $config_host_mak
+  echo "BOOST_LIB=$boostdir/lib" >> $config_host_mak
+fi
+
+
+
 # USB host support
 case "$usb" in
 linux)
@@ -4044,6 +4119,7 @@ else
 fi
 echo "PYTHON=$python" >> $config_host_mak
 echo "CC=$cc" >> $config_host_mak
+echo "CXX=$cxx" >> $config_host_mak
 echo "CC_I386=$cc_i386" >> $config_host_mak
 echo "HOST_CC=$host_cc" >> $config_host_mak
 echo "OBJCC=$objcc" >> $config_host_mak

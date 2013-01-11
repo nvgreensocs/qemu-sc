@@ -157,7 +157,11 @@ $(QEMU_PROG): $(QEMU_PROGW)
 	$(call quiet-command,$(OBJCOPY) --subsystem console $(QEMU_PROGW) $(QEMU_PROG),"  GEN   $(TARGET_DIR)$(QEMU_PROG)")
 else
 $(QEMU_PROG): $(all-obj-y) ../libqemuutil.a ../libqemustub.a
-	$(call LINK,$^)
+ifdef CONFIG_SYSTEMC_WRAPPER
+	$(call LINK++,$^)
+else # CONFIG_SYSTEMC_WRAPPER
+    $(call LINK,$^)
+endif # !CONFIG_SYSTEMC_WRAPPER
 endif
 
 gdbstub-xml.c: $(TARGET_XML_FILES) $(SRC_PATH)/scripts/feature_to_c.sh

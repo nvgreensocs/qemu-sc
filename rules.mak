@@ -51,6 +51,8 @@ endif
 %.o: %.dtrace
 	$(call quiet-command,dtrace -o $@ -G -s $<, "  GEN   $(TARGET_DIR)$@")
 
+LINK++ = $(call quiet-command,$(CXX) $(QEMU_CFLAGS) $(CFLAGS) $(LDFLAGS) -L$(SYSTEMC_LIB) -lsystemc -o $@ $(sort $(filter %.o, $1)) $(filter-out %.o, $1) $(LIBS),"  LINK+ $(TARGET_DIR)$@")
+
 %$(EXESUF): %.o
 	$(call LINK,$^)
 
