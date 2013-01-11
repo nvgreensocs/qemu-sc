@@ -160,6 +160,9 @@ $(obj)/adlib.o $(obj)/fmopl.o: QEMU_CFLAGS += -DBUILD_Y8950=0
 
 common-obj-$(CONFIG_SOUND) += $(sound-obj-y)
 
+# SystemC
+common-obj-$(CONFIG_SYSTEMC_WRAPPER) += systemC/
+
 common-obj-$(CONFIG_REALLY_VIRTFS) += 9pfs/
 
 common-obj-y += usb/
