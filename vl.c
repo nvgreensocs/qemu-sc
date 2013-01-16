@@ -93,6 +93,11 @@
 #include <windows.h>
 #endif
 
+#ifdef CONFIG_SYSTEMC_WRAPPER
+int qemu_main(int argc, char **argv, char **envp);
+#undef main
+#define main qemu_main
+#else /* !CONFIG_SYSTEMC_WRAPPER */
 #ifdef CONFIG_SDL
 #if defined(__APPLE__) || defined(main)
 #include <SDL.h>
@@ -105,6 +110,7 @@ int main(int argc, char **argv)
 #define main qemu_main
 #endif
 #endif /* CONFIG_SDL */
+#endif /* !CONFIG_SYSTEMC_WRAPPER */
 
 #ifdef CONFIG_COCOA
 #undef main
