@@ -2,6 +2,7 @@ common-obj-y = sc_pci.o
 common-obj-y += sc_mmio.o
 common-obj-y += sc_device.o
 common-obj-y += sc_pci_device.o
+common-obj-y += sc_mmio_device.o
 
 # Special rule for systemC file.
 hw/systemC/%.o: $(SRC_PATH)/hw/systemC/%.cpp
