@@ -35,20 +35,46 @@ extern "C"
 #define SC_MMIO_DEVICE_H
 
 /*
+ * Need that for QEMU device creation.
+ */
+typedef struct {} SysBusDevice;
+
+extern "C"
+{
+    /*
+     * From sysbus.h.
+     */
+    void sysbus_mmio_map(SysBusDevice *dev, int n, hwaddr addr);
+    #define sysbus_from_qdev(dev) ((SysBusDevice *)(dev))
+    #include "sc_mmio_common.h"
+}
+
+/*
  * This implement the SCDevice class.
  */
 
 class SCMMIODevice : public SCDevice
 {
 public:
-    SCMMIODevice(std::string deviceName);
+    SCMMIODevice(sc_core::sc_module_name name, std::string deviceName,
+                 SCMMIOInfo *deviceInfo, uint64_t baseAddress);
     ~SCMMIODevice();
     void parseGSParam();
     void registerQEMUDevice();
     static SCMMIOInfo *getMMIODeviceInfo();
     static unsigned int getMMIODeviceCounter();
-private:
+
+    /*
+     * Connect the device to a greenrouter.
+     */
+    virtual void connect(gs::gp::GenericRouter<32> *router);
+protected:
     static std::vector<SCMMIOInfo> devicesToBeRegistered;
+private:
+    /*
+     * This is the information about MMIO device.
+     */
+    SCMMIOInfo *mmioDeviceInfo;
 };
 
 #endif /* SC_MMIO_DEVICE_H */

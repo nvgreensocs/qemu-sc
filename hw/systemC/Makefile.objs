@@ -4,12 +4,18 @@ common-obj-y += sc_device.o
 common-obj-y += sc_pci_device.o
 common-obj-y += sc_mmio_device.o
 common-obj-y += sc_wrapper.o
+common-obj-y += sc_platform.o
+common-obj-y += sc_pci_counter.o
+common-obj-y += sc_mmio_counter.o
 
 # Special rule for systemC file.
-hw/systemC/%.o: $(SRC_PATH)/hw/systemC/%.cpp
-	$(call quiet-command,$(CXX) -I$(TLM_INCLUDE)                               \
+hw/systemC/%.o: $(SRC_PATH)/hw/systemC/%.cpp $(SRC_PATH)/hw/systemC/%.h
+	$(call quiet-command,$(CXX) -I$(SRC_PATH)                                  \
+                                -I$(SRC_PATH)/include                          \
+                                -I$(TLM_INCLUDE)                               \
                                 -I$(SYSTEMC_INCLUDE)                           \
                                 -I$(BOOST_INCLUDE)                             \
                                 -I$(GREENSOCS_INCLUDE)                         \
                                 -DSC_INCLUDE_DYNAMIC_PROCESSES                 \
-                                -fPIC -c -o $@ $<,"  CXX   $(TARGET_DIR)$@")
+                                -DUSE_GPSOCKET                                 \
+                                -g -fPIC -c -o $@ $<,"  CXX   $(TARGET_DIR)$@")

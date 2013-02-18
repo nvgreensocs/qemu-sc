@@ -26,7 +26,9 @@
 
 unsigned int SCDevice::deviceCounter = 0;
 
-SCDevice::SCDevice(std::string deviceName)
+SCDevice::SCDevice(sc_core::sc_module_name name, std::string deviceName):
+    target_port("target_port"),
+    sc_core::sc_module(name)
 {
     this->deviceName = deviceName;
     deviceID = deviceCounter++;

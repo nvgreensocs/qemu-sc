@@ -95,6 +95,11 @@
 
 #ifdef CONFIG_SYSTEMC_WRAPPER
 int qemu_main(int argc, char **argv, char **envp);
+void sc_platform_init(void);
+static void sc_timer_cb(void *opaque);
+int64_t sc_simulation(int64_t qemu_time);
+int qemu_loop(void);
+QEMUTimer *systemc_timer;
 #undef main
 #define main qemu_main
 #else /* !CONFIG_SYSTEMC_WRAPPER */
@@ -4270,6 +4275,10 @@ int main(int argc, char **argv, char **envp)
                                  .cpu_model = cpu_model };
     machine->init(&args);
 
+#ifdef CONFIG_SYSTEMC_WRAPPER
+    sc_platform_init();
+#endif /* CONFIG_SYSTEMC_WRAPPER */
+
     cpu_synchronize_all_post_init();
 
     set_numa_modes();
@@ -4355,6 +4364,8 @@ int main(int argc, char **argv, char **envp)
         exit(1);
     }
 
+
+
     /* TODO: once all bus devices are qdevified, this should be done
      * when bus is created by qdev.c */
     qemu_register_reset(qbus_reset_all_fn, sysbus_get_default());
@@ -4382,6 +4393,10 @@ int main(int argc, char **argv, char **envp)
     os_setup_post();
 
     resume_all_vcpus();
+#ifndef CONFIG_SYSTEMC_WRAPPER
+    /*
+     * This is called in qemu_loop which is part of SystemC simulation.
+     */
     main_loop();
     bdrv_close_all();
     pause_all_vcpus();
@@ -4389,6 +4404,55 @@ int main(int argc, char **argv, char **envp)
 #ifdef CONFIG_TPM
     tpm_cleanup();
 #endif
-
+#else
+    /*
+     * Timer used for SystemC synchronization.
+     */
+    systemc_timer = qemu_new_timer_ms(vm_clock, sc_timer_cb, NULL);
+    qemu_mod_timer(systemc_timer, qemu_get_clock_ms(vm_clock));
+#endif /* CONFIG_SYSTEMC_WRAPPER */
     return 0;
 }
+
+#ifdef CONFIG_SYSTEMC_WRAPPER
+static void sc_timer_cb(void *opaque)
+{
+    /*
+     * QEMU Virtual Machine Time.
+     */
+    int64_t qemu_time_vm;
+
+    /*
+     * The time at which QEMU must be stopped to let the systemC simulation
+     * continue.
+     */
+    int64_t systemc_restart_time;
+
+    /*
+     * Get the current Virtual Machine Time.
+     */
+    qemu_time_vm = qemu_get_clock_ms(vm_clock);
+
+    /*
+     * Simulate systemc.
+     */
+    systemc_restart_time = sc_simulation(qemu_time_vm);
+
+    /*
+     * Call this callback for the next SystemC simulation time.
+     */
+    qemu_mod_timer(systemc_timer, systemc_restart_time);
+}
+
+int qemu_loop(void)
+{
+    main_loop();
+    bdrv_close_all();
+    pause_all_vcpus();
+    res_free();
+#ifdef CONFIG_TPM
+    tpm_cleanup();
+#endif
+    return 0;
+}
+#endif /* CONFIG_SYSTEMC_WRAPPER */

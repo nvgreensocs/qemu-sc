@@ -51,15 +51,54 @@ while(0)
 #include "sc_pci_device.h"
 
 /*
- * This static variable is used to register device into QEMU.
+ * This static vector is used to register device into QEMU.
  */
 std::vector<SCPCIInfo> SCPCIDevice::devicesToBeRegistered;
 
-SCPCIDevice::SCPCIDevice(std::string deviceName) :
-    SCDevice(deviceName)
+/*
+ * This static vector is used to keep instanciated devices.
+ */
+std::vector<SCPCIDevice *> SCPCIDevice::instanciatedDevices;
+
+SCPCIDevice::SCPCIDevice(sc_core::sc_module_name name,
+                         std::string deviceName,
+                         SCPCIInfo *pciDeviceInfo):
+    SCDevice(name, deviceName)
 {
-    DBG("device created: " << deviceName);
+    PCIBus *rootPCIBus;
+    DeviceState *qemuDevice;
+
     this->deviceName = deviceName;
+    this->pciDeviceInfo = pciDeviceInfo;
+
+    /*
+     * Look for a PCI Bus in QEMU.
+     */
+    rootPCIBus = pci_find_root_bus(0);
+    if (rootPCIBus == NULL)
+    {
+        ERR("No pci bus found.");
+        return;
+    }
+
+    /*
+     * Create and Init the QEMU device.
+     */
+    qemuDevice = qdev_create((BusState *)rootPCIBus, deviceName.c_str());
+    qdev_init(qemuDevice);
+    DBG("device created: " << deviceName);
+
+    /*
+     * Keep the pointer so we can set the TLM address when necessary.
+     */
+    this->qemuDevice = qemuDevice;
+    instanciatedDevices.push_back(this);
+
+    /*
+     * PCI Socket configuration.
+     */
+	target_port.bind_b_if(*this);
+	target_port.peq.out_port(*this);
 }
 
 SCPCIDevice::~SCPCIDevice()
@@ -77,26 +116,6 @@ void SCPCIDevice::parseGSParam()
      */
 }
 
-/*
- * Device must be registred in QEMU by sc_pci.
- * This is linked with sc_pci abstract device.
- */
-void SCPCIDevice::registerQEMUDevice()
-{
-    /*
-     * Fill the scPCIDeviceToBeRegistered vector.
-     */
-    DBG("device to be registered: " << deviceName);
-    SCPCIInfo deviceInfo;
-    if (deviceName.length() > 63)
-    {
-        WRN("Device name exceeds 63 characters.");
-    }
-    strncpy(deviceInfo.name, deviceName.c_str(), 64);
-    deviceInfo.name[63] = '\0';
-    devicesToBeRegistered.push_back(deviceInfo);
-}
-
 SCPCIInfo *SCPCIDevice::getDeviceInfo()
 {
     return (SCPCIInfo *)&devicesToBeRegistered[0];
@@ -107,6 +126,42 @@ unsigned int SCPCIDevice::getPCIDeviceCounter()
     return devicesToBeRegistered.size();
 }
 
+void SCPCIDevice::setTLMAddress(DeviceState *dev, uint8_t bar, hwaddr addr)
+{
+    DBG("TLM Address set to: " << addr << " for device " << dev
+        << " BAR " << (unsigned int)(bar) << ".");
+    /*
+     * Maybe slow when we have a big amount of device. But it's called one time
+     * at the first R/W.
+     */
+    for (int i = 0; i < instanciatedDevices.size(); i++)
+    {
+        if (instanciatedDevices[i]->qemuDevice == dev)
+        {
+            /*
+             * We found it just write the TLM Address and refresh the router
+             * Address map.
+             */
+            instanciatedDevices[i]->target_port.base_addr = addr;
+            instanciatedDevices[i]->target_port.high_addr = addr
+                      + instanciatedDevices[i]->pciDeviceInfo->regionsSize[bar];
+            instanciatedDevices[i]->pciRouter->refreshAddressMap();
+            break;
+        }
+    }
+}
+
+void SCPCIDevice::connect(gs::gp::GenericRouter<32> *router)
+{
+    DBG("connect " << deviceName << " on a router.");
+
+    /*
+     * Keep the pciRouter to refresh it's address map after changing TLM
+     * Address.
+     */
+    this->pciRouter = router;
+    pciRouter->init_socket(target_port);
+}
 
 SCPCIInfo *getPCIDeviceInfo()
 {
@@ -116,4 +171,9 @@ SCPCIInfo *getPCIDeviceInfo()
 unsigned int getPCIDeviceCounter(void)
 {
     return SCPCIDevice::getPCIDeviceCounter();
+}
+
+void set_tlm_address(DeviceState *dev, uint8_t bar, hwaddr addr)
+{
+    SCPCIDevice::setTLMAddress(dev, bar, addr);
 }

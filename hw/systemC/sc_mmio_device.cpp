@@ -56,11 +56,38 @@ while(0)
  */
 std::vector<SCMMIOInfo> SCMMIODevice::devicesToBeRegistered;
 
-SCMMIODevice::SCMMIODevice(std::string deviceName) :
-    SCDevice(deviceName)
+SCMMIODevice::SCMMIODevice(sc_core::sc_module_name name,
+                           std::string deviceName, SCMMIOInfo *deviceInfo,
+                           uint64_t baseAddress):
+    SCDevice(name, deviceName)
 {
-    DBG("device created: " << deviceName);
     this->deviceName = deviceName;
+    this->mmioDeviceInfo = deviceInfo;
+
+    qemuDevice = qdev_create(NULL, deviceName.c_str());
+    qdev_init(qemuDevice);
+
+    sysbus_mmio_map(sysbus_from_qdev(qemuDevice), 0, baseAddress);
+
+    /*
+     * Will see that later.
+     * sysbus_connect_irq(s, 0, irq);
+     */
+
+    DBG("device created: " << deviceName);
+
+    /*
+     * Keep the pointer for interrupt handling.
+     */
+    this->qemuDevice = qemuDevice;
+
+    /*
+     * Target Socket configuration.
+     */
+    target_port.base_addr = baseAddress;
+    target_port.high_addr = baseAddress + mmioDeviceInfo->size - 1;
+    target_port.bind_b_if(*this);
+    target_port.peq.out_port(*this);
 }
 
 SCMMIODevice::~SCMMIODevice()
@@ -96,6 +123,19 @@ void SCMMIODevice::registerQEMUDevice()
     strncpy(deviceInfo.name, deviceName.c_str(), 64);
     deviceInfo.name[63] = '\0';
     devicesToBeRegistered.push_back(deviceInfo);
+}
+
+/*
+ * Connect the device to a greenrouter.
+ */
+void SCMMIODevice::connect(gs::gp::GenericRouter<32> *router)
+{
+    DBG("connect " << deviceName << " on a router.");
+
+    /*
+     * Nothing more to do.
+     */
+    router->init_socket(target_port);
 }
 
 SCMMIOInfo *SCMMIODevice::getMMIODeviceInfo()
