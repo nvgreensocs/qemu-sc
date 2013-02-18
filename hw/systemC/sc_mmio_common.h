@@ -22,11 +22,23 @@
  *
  */
 
+#include "stdint.h"
+#include "exec/hwaddr.h"
+
 #ifndef SC_MMIO_COMMON_H
 #define SC_MMIO_COMMON_H
 
+/*
+ * SCMMIOInfo:
+ * name:
+ * The name of the QEMU device.
+ * size:
+ * The size of the IO area.
+ */
+
 typedef struct SCMMIOInfo {
     char name[64];
+    uint64_t size;
 } SCMMIOInfo;
 
 SCMMIOInfo *getMMIODeviceInfo(void);

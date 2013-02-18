@@ -28,7 +28,9 @@
 #include "hw/hw.h"
 #include "hw/pci/pci.h"
 #include "hw/sysbus.h"
+#include "sc_common.h"
 #include "sc_mmio_common.h"
+
 
 #define TYPE_SC_MMIO "sc-mmio"
 #define SC_MMIO(obj) OBJECT_CHECK(SCMMIOState, (obj), TYPE_SC_MMIO)
@@ -39,6 +41,9 @@
 
 typedef struct SCMMIOState {
     SysBusDevice parent_obj;
+    hwaddr base_address;
+    MemoryRegion mmio;
+    int32_t deviceType;
 } SCMMIOState;
 
 

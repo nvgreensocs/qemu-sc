@@ -1,5 +1,5 @@
 /*
- * SC_PCI
+ * SC_COMMON
  *
  *  Copyright (C) 2013 : GreenSocs Ltd
  *      http://www.greensocs.com/ , email: info@greensocs.com
@@ -22,30 +22,17 @@
  *
  */
 
-#ifndef SC_PCI_H
-#define SC_PCI_H
+/*
+ * These are common prototypes for systemc devices, and qemu backend.
+ */
 
-#include "hw/hw.h"
-#include "hw/pci/pci.h"
-#include "sc_common.h"
-#include "sc_pci_common.h"
+#ifndef SC_COMMON_H
+#define SC_COMMON_H
 
-#define TYPE_SC_PCI "sc-pci"
-#define SC_PCI(obj) OBJECT_CHECK(SCPCIState, (obj), TYPE_SC_PCI)
-#define SC_PCI_GET_CLASS(obj) \
-        OBJECT_GET_CLASS(SCPCIClass, (obj), TYPE_SC_PCI)
-#define SC_PCI_CLASS(klass) \
-        OBJECT_CLASS_CHECK(SCPCIClass, (klass), TYPE_SC_PCI)
+/*
+ * Defined in sc_wrapper.cpp.
+ */
+void sc_write(hwaddr addr, uint32_t value, uint32_t size);
+uint32_t sc_read(hwaddr addr, uint32_t size);
 
-typedef struct SCPCIState {
-    PCIDevice parent_obj;
-    MemoryRegion mem;
-    int32_t deviceType;
-    /*
-     * TLM Address will be set at the first R/W on the bar.
-     * Keep a boolean per bar to be sure the address is set.
-     */
-    bool tlmAddressSet[6];
-} SCPCIState;
-
-#endif /* SC_PCI_H */
+#endif /* SC_COMMON_H */

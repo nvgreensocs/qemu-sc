@@ -23,10 +23,6 @@
  */
 
 #include "sc_device.h"
-extern "C"
-{
-    #include "sc_pci_common.h"
-}
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -36,28 +32,55 @@ extern "C"
 #define SC_PCI_DEVICE_H
 
 /*
+ * Need that for QEMU device creation.
+ */
+typedef struct {} PCIBus;
+
+extern "C"
+{
+    /*
+     * From pci.h.
+     */
+    PCIBus *pci_find_root_bus(int domain);
+    #include "sc_pci_common.h"
+}
+
+/*
  * This implement the SCDevice class.
  */
-
-class SCPCIDevice : public SCDevice
+class SCPCIDevice:
+    public SCDevice
 {
 public:
-    SCPCIDevice(std::string deviceName);
+    SCPCIDevice(sc_core::sc_module_name name, std::string deviceName,
+                SCPCIInfo *pciDeviceInfo);
     ~SCPCIDevice();
     void parseGSParam();
-    void registerQEMUDevice();
     static SCPCIInfo *getDeviceInfo();
     static unsigned int getPCIDeviceCounter();
-private:
-    int BARRegionsType[6];
-    int BARRegionsSize[6];
-    unsigned int TLMAddress[6];
-    bool hasINT;
-    int PCIVendorID;
-    int PCIDeviceID;
-    int PCIClassID;
-    int PCIRevisionID;
+
+    /*
+     * Called in sc_pci: to set the TLM address for the pciPort.
+     */
+    static void setTLMAddress(DeviceState *dev, uint8_t bar, hwaddr addr);
+    
+    /*
+     * Connect the device to a greenrouter.
+     */
+    void connect(gs::gp::GenericRouter<32> *router);
+protected:
     static std::vector<SCPCIInfo> devicesToBeRegistered;
+private:
+    static std::vector<SCPCIDevice *> instanciatedDevices;
+    /*
+     * This is the information about PCI device.
+     */
+    SCPCIInfo *pciDeviceInfo;
+
+    /*
+     * This is the PCI router on which the device is connected.
+     */
+    gs::gp::GenericRouter<32> *pciRouter;
 };
 
 #endif /* SC_DEVICE_H */
