@@ -972,6 +972,9 @@ fi
 if [ ! -e "$syscdir/include/systemc" ]; then
     echo "unable to find systemc library. Try using --with-systemc="
     show_help="yes"
+else
+    SC_VER=`cat $syscdir/include/sysc/kernel/sc_ver.h | \
+    grep "#define SC_API_VERSION_STRING" | cut -d ' ' -f 3 `
 fi
 
 if [ ! -e "$tlmdir/include/tlm" ]; then
@@ -4026,12 +4029,16 @@ if test "$systemc_wrapper" = "yes" ; then
   else
     echo "SYSTEMC_LIB=$syscdir/lib-linux" >> $config_host_mak
   fi
-  echo "TLM_INCLUDE=$tlmdir/include/tlm" >> $config_host_mak
+
+# two differents directories if systemc 2.2.0 or 2.3.0
+    if [ "$SC_VER" = "sc_api_version_2_3_0" ]; then
+      echo "TLM_INCLUDE=$syscdir/include" >> $config_host_mak
+    else
+      echo "TLM_INCLUDE=$tlmdir/include/tlm" >> $config_host_mak
+    fi
   echo "BOOST_INCLUDE=$boostdir/include" >> $config_host_mak
   echo "BOOST_LIB=$boostdir/lib" >> $config_host_mak
 fi
-
-
 
 # USB host support
 case "$usb" in
