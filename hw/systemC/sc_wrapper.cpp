@@ -151,14 +151,14 @@ int64_t sc_simulation(int64_t qemu_time)
     /*
      * Time to catch.
      */
-    sc_core::sc_time late = sc_core::sc_time(qemu_time, sc_core::SC_NS)
+    sc_core::sc_time late = sc_core::sc_time((double)qemu_time, sc_core::SC_NS)
                             - sc_core::sc_time_stamp();
 
     /*
      * Next trigger.
      */
-    sc_core::sc_time next = sc_core::sc_time(qemu_time, sc_core::SC_NS)
-                            + sc_core::sc_time(SCWrapper::getQuantum(),
+    sc_core::sc_time next = sc_core::sc_time((double)qemu_time, sc_core::SC_NS)
+                            + sc_core::sc_time((double)SCWrapper::getQuantum(),
                                                sc_core::SC_NS);
 
     /*
