@@ -1,5 +1,5 @@
 /*
- * SYSTEMC DEVICE
+ * sc_irq.h
  *
  *  Copyright (C) 2013 : GreenSocs Ltd
  *      http://www.greensocs.com/ , email: info@greensocs.com
@@ -22,49 +22,23 @@
  *
  */
 
-#include "sc_device.h"
+/*
+ * This is needed for interruption.
+ */
+#include "greensignalsocket/green_signal.h"
 
-unsigned int SCDevice::deviceCounter = 0;
+#ifndef SC_IRQ_H
+#define SC_IRQ_H
 
-SCDevice::SCDevice(sc_core::sc_module_name name, std::string deviceName):
-    sc_core::sc_module(name),
-    target_port("target_port"),
-    irq_socket("master_socket")
+GS_GUARD_ONLY_EXTENSION(IRQ);
+
+extern "C"
 {
-    this->deviceName = deviceName;
-    deviceID = deviceCounter++;
-
     /*
-     * Interrupt configuration.
+     * From irq.h.
      */
-	gs::socket::config<gs_generic_signal::gs_generic_signal_protocol_types> cnf;
-	cnf.use_mandatory_extension<IRQ>();
-	irq_socket.set_config(cnf);
-
-    /*
-     * Init the IRQ to NULL by default.
-     */
-    qemuIRQ = NULL;
+    typedef struct IRQState *qemu_irq;
+    void qemu_set_irq(qemu_irq irq, int level);
 }
 
-std::string SCDevice::getDeviceName()
-{
-    return deviceName;
-}
-
-unsigned int SCDevice::getDeviceID()
-{
-    return deviceID;
-}
-
-DeviceState *SCDevice::getQEMUDevice()
-{
-    return qemuDevice;
-}
-
-qemu_irq SCDevice::getQEMUIRQ()
-{
-    return qemuIRQ;
-}
-
-
+#endif /* SC_IRQ_H */

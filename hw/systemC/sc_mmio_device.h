@@ -46,6 +46,8 @@ extern "C"
      */
     void sysbus_mmio_map(SysBusDevice *dev, int n, hwaddr addr);
     #define sysbus_from_qdev(dev) ((SysBusDevice *)(dev))
+    void sysbus_connect_irq(SysBusDevice *dev, int n, qemu_irq irq);
+    DeviceState *sysbus_create_varargs(const char *name, hwaddr addr, ...);
     #include "sc_mmio_common.h"
 }
 
@@ -57,10 +59,10 @@ class SCMMIODevice : public SCDevice
 {
 public:
     SCMMIODevice(sc_core::sc_module_name name, std::string deviceName,
-                 SCMMIOInfo *deviceInfo, uint64_t baseAddress);
+                 SCMMIOInfo *deviceInfo, uint64_t baseAddress,
+                 qemu_irq IRQ = NULL);
     ~SCMMIODevice();
     void parseGSParam();
-    void registerQEMUDevice();
     static SCMMIOInfo *getMMIODeviceInfo();
     static unsigned int getMMIODeviceCounter();
 
@@ -68,6 +70,8 @@ public:
      * Connect the device to a greenrouter.
      */
     virtual void connect(gs::gp::GenericRouter<32> *router);
+
+    qemu_irq getQEMUIRQ();
 protected:
     static std::vector<SCMMIOInfo> devicesToBeRegistered;
 private:

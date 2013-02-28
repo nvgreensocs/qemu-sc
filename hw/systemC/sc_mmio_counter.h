@@ -28,18 +28,28 @@
 #include <iostream>
 #include <systemc>
 #include "sc_mmio_device.h"
+
+/*
+ * This is needed for Slave Socket.
+ */
 #include "gsgpsocket/transport/GSGPSlaveSocket.h"
 
+/*
+ * This is needed for interruption.
+ */
+#include "sc_irq.h"
+
 class SCMMIOCounter:
+
     /*
-     * SCMMIODevice: Allow the device to be registered by QEMU.
+     * SCMMIODevice: Base class for MMIO SystemC device registered by QEMU.
      */
     public SCMMIODevice
 {
     public:
     SC_HAS_PROCESS(SCMMIOCounter);
-    SCMMIOCounter(uint64_t baseAddress);
-    
+    SCMMIOCounter(uint64_t baseAddress, qemu_irq IRQ);
+
     /*
      * Info needed by QEMU.
      */
@@ -58,10 +68,23 @@ class SCMMIOCounter:
     void notify(gs::gp::slave_atom& tc);
 
     /*
-     * IP variables: here just the counter.
+     * IP variables.
+     */
+
+    /*
+     * Counter value.
      */
     uint8_t counter;
+
+    /*
+     * IRQ Register.
+     * 2^1: 0xFF -> 0x00 overflow occurs.
+     * 2^2: 0x00 -> 0xFF overflow occurs.
+     */
+    uint8_t irqRegister;
+
     int IPmodel(accessHandle t);
+    void updateIRQ();
 };
 
 #endif /* SC_MMIO_COUNTER_H */

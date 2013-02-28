@@ -41,7 +41,21 @@ typedef struct SCMMIOInfo {
     uint64_t size;
 } SCMMIOInfo;
 
+/*
+ * Get the infos of the SystemC registered devices.
+ */
 SCMMIOInfo *getMMIODeviceInfo(void);
+
+/*
+ * Get the amount of registered devices.
+ */
 unsigned int getMMIODeviceCounter(void);
+
+/*
+ * Return the QEMU IRQ for a given device.
+ * Called in sc_mmio_device.cpp to keep the IRQ pointer.
+ * Then the IRQ can be Raised/Lowed in the wrapper code.
+ */
+qemu_irq get_mmio_irq(DeviceState *dev);
 
 #endif /* SC_MMIO_COMMON_H */

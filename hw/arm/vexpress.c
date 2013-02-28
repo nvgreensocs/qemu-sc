@@ -36,6 +36,8 @@
 #define VEXPRESS_FLASH_SIZE (64 * 1024 * 1024)
 #define VEXPRESS_FLASH_SECT_SIZE (256 * 1024)
 
+void export_irq(qemu_irq *pic, unsigned int count);
+
 static struct arm_boot_info vexpress_binfo;
 
 /* Address maps for peripherals:
@@ -501,9 +503,14 @@ static void vexpress_common_init(const VEDBoardInfo *daughterboard,
     memory_region_add_subregion(sysmem, map[VE_VIDEORAM], vram);
 
     /* 0x4e000000 LAN9118 Ethernet */
-    if (nd_table[0].used) {
+    /*if (nd_table[0].used) {
         lan9118_init(&nd_table[0], map[VE_ETHERNET], pic[15]);
-    }
+    }*/
+
+    /*
+     * Export IRQ to SystemC.
+     */
+    export_irq(pic, 64);
 
     /* VE_USB: not modelled */
 

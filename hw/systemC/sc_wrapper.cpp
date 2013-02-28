@@ -34,11 +34,17 @@ extern "C"
     #include "sc_common.h"
     int64_t sc_simulation(int64_t qemu_time);
     int qemu_loop(void);
+
     /*
      * in sysemu.h
      */
     void vm_stop(int);
     void vm_start();
+
+    /*
+     * In this file.
+     */
+    void export_irq(qemu_irq *pic, unsigned int count);
 }
 
 /*
@@ -96,15 +102,22 @@ tlm_utils::tlm_quantumkeeper SCWrapper::quantumKeeper;
  */
 uint64_t SCWrapper::quantum = 0;
 
+/*
+ * This static variable is the IRQ exported by QEMU.
+ */
+vector<qemu_irq> SCWrapper::qemuExportedIRQ;
+
+/*
+ * This static variable is the IRQ table.
+ * Each irq port have a QEMU IRQ Line attached.
+ */
+vector<qemu_irq> SCWrapper::qemuIRQTable;
+
 SCWrapper::SCWrapper(sc_core::sc_module_name name, uint64_t quantum):
-    pciPort("iport")
+    master_socket("iport"),
+    irq_socket("interrupt_socket")
     //memPort("memPort")
 {
-    /*
-     * For port configuration.
-     */
-    //gs::gp::GSGPSocketConfig cnf;
-
     DBG(name << " created.");
     if (defaultWrapper == NULL)
     {
@@ -115,14 +128,17 @@ SCWrapper::SCWrapper(sc_core::sc_module_name name, uint64_t quantum):
         ERR("Only one wrapper can be created!");
         return;
     }
-    pciPort.out_port(*this);
+
+    master_socket.out_port(*this);
     SC_THREAD(run);
 
     /*
-     * Configure the pciPort.
+     * Configure the IRQ Socket.
      */
-    /*cnf.use_wr_resp = false;
-    pciPort.set_config(cnf);*/
+	gs::socket::config<gs_generic_signal::gs_generic_signal_protocol_types> cnf;
+	cnf.use_mandatory_extension<IRQ>();
+	irq_socket.set_config(cnf);
+	irq_socket.register_b_transport(this, &SCWrapper::irq_b_transport);
 
     /*
      * Set the quantum.
@@ -202,6 +218,28 @@ uint64_t SCWrapper::getQuantum()
     return SCWrapper::quantum;
 }
 
+/*
+ * Get the default wrapper.
+ */
+SCWrapper *SCWrapper::getDefaultWrapper()
+{
+    return SCWrapper::defaultWrapper;
+}
+
+/*
+ * Those one are called by QEMU.
+ * TODO: take a look at performance.
+ */
+void sc_write(hwaddr addr, uint32_t value, uint32_t size)
+{
+    SCWrapper::getDefaultWrapper()->sc_write(addr, value, size);
+}
+
+uint32_t sc_read(hwaddr addr, uint32_t size)
+{
+    return SCWrapper::getDefaultWrapper()->sc_read(addr, size);
+}
+
 void SCWrapper::sc_write(hwaddr addr, uint32_t value, uint32_t size)
 {
     DBG("attempt to write value " << value << " @" << addr);
@@ -214,12 +252,12 @@ void SCWrapper::sc_write(hwaddr addr, uint32_t value, uint32_t size)
     /*
      * Make the transaction.
      */
-	tHandle = pciPort.create_transaction();
+	tHandle = master_socket.create_transaction();
 	tHandle->setMCmd(gs::Generic_MCMD_WR);
 	tHandle->setMData(data);
 	tHandle->setMAddr(addr);
 	tHandle->setMBurstLength(size);
-	pciPort.Transact(tHandle);
+	master_socket.Transact(tHandle);
 
     wait(sc_core::SC_ZERO_TIME);
 }
@@ -236,43 +274,17 @@ uint32_t SCWrapper::sc_read(hwaddr addr, uint32_t size)
     /*
      * Make the transaction.
      */
-    tHandle = pciPort.create_transaction();
+    tHandle = master_socket.create_transaction();
     tHandle->setMCmd(gs::Generic_MCMD_RD);
     tHandle->setMAddr(addr);
     tHandle->setMBurstLength(size);
     tHandle->setMData(data);
-    pciPort.Transact(tHandle);
+    master_socket.Transact(tHandle);
 
 	wait(sc_core::SC_ZERO_TIME);
 	aux = *(uint32_t*) (data.getPointer());
 
 	return aux;
-}
-
-/*
- * Those one are called by QEMU.
- */
-void sc_write(hwaddr addr, uint32_t value, uint32_t size)
-{
-    SCWrapper::write(addr, value, size);
-}
-
-uint32_t sc_read(hwaddr addr, uint32_t size)
-{
-    SCWrapper::read(addr, size);
-}
-
-/*
- * Read / Write to memory.
- */
-void SCWrapper::write(hwaddr addr, uint32_t value, uint32_t size)
-{
-    defaultWrapper->sc_write(addr, value, size);
-}
-
-uint32_t SCWrapper::read(hwaddr addr, uint32_t size)
-{
-	return defaultWrapper->sc_read(addr, size);
 }
 
 /*
@@ -300,5 +312,85 @@ void SCWrapper::notify(gs::gp::master_atom& tc)
 void SCWrapper::notify(gs::gp::slave_atom& tc)
 {
 	DBG("Slave notify.");
+}
+
+/******************************************************************************\
+| IRQ Related.                                                                 |
+\******************************************************************************/
+
+/*
+ * Called in QEMU platform, for exporting IRQ to the wrapper.
+ */
+void export_irq(qemu_irq *pic, unsigned int count)
+{
+    SCWrapper::exportIRQ(pic, count);
+}
+
+void SCWrapper::exportIRQ(qemu_irq *pic, unsigned int count)
+{
+    DBG("IRQ exported.");
+    for (int i = 0; i < count; i++)
+    {
+        SCWrapper::qemuExportedIRQ.push_back(pic[i]);
+    }
+}
+
+/*
+ * Get the IRQ number n.
+ */
+qemu_irq SCWrapper::getQEMUIRQ(unsigned int n)
+{
+    if (n > SCWrapper::qemuExportedIRQ.size())
+    {
+        ERR("IRQ not found: " << n);
+    }
+    assert(n < SCWrapper::qemuExportedIRQ.size());
+    DBG("IRQ#" << n << " = " << (void *)(SCWrapper::qemuExportedIRQ[n]));
+    return SCWrapper::qemuExportedIRQ[n];
+}
+
+/*
+ * Plug IRQ of a SCDevice.
+ */
+void SCWrapper::plugIRQ(SCDevice *scDevice)
+{
+    scDevice->irq_socket(irq_socket);
+
+    /*
+     * Keep the IRQ pointer in a vector.
+     * At the end, we have 1 IRQ_PORT <=> 1 QEMU_PORT.
+     */
+    qemuIRQTable.push_back(scDevice->getQEMUIRQ());
+}
+
+/*
+ * Transaction for IRQ Socket.
+ */
+void SCWrapper::irq_b_transport(unsigned int port, irqPayload& payload,
+                                sc_core::sc_time& time)
+{
+    /*
+     * QEMU IRQ Line to Raise/Low.
+     */
+    qemu_irq qemuIRQ = qemuIRQTable[port];
+
+    /*
+     * Level of the IRQ Line.
+     */
+    bool *value = (bool *) payload.get_data_ptr();
+
+    DBG("IRQ! on port " << port << " level " << *value);
+
+    /*
+     * Raise/Low the IRQ in QEMU.
+     */
+    if (*value)
+    {
+        qemu_set_irq(qemuIRQ, 1);
+    }
+    else
+    {
+        qemu_set_irq(qemuIRQ, 0);
+    }
 }
 
