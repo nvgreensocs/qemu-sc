@@ -26,7 +26,6 @@
 #define SC_MMIO_H
 
 #include "hw/hw.h"
-#include "hw/pci/pci.h"
 #include "hw/sysbus.h"
 #include "sc_common.h"
 #include "sc_mmio_common.h"
@@ -41,8 +40,21 @@
 
 typedef struct SCMMIOState {
     SysBusDevice parent_obj;
+
+    /*
+     * Base address of the MMIO area.
+     */
     hwaddr base_address;
     MemoryRegion mmio;
+
+    /*
+     * IRQ connected to the device.
+     */
+    qemu_irq irq;
+
+    /*
+     * Device type id, infos about the device can be found with this field.
+     */
     int32_t deviceType;
 } SCMMIOState;
 

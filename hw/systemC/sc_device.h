@@ -37,6 +37,11 @@
 #include "gsgpsocket/transport/GSGPMasterBlockingSocket.h"
 #include "greenrouter/genericRouter.h"
 
+/*
+ * For interruption socket.
+ */
+#include "sc_irq.h"
+
 #ifndef SC_DEVICE_H
 #define SC_DEVICE_H
 
@@ -82,10 +87,25 @@ class SCDevice:
     typedef gs::gp::GenericSlavePort<32>::accessHandle accessHandle;
     typedef gs::gp::GenericSlavePort<32>::phase phase;
 
+	/*
+     * Socket for interruption.
+     */
+	gs_generic_signal::initiator_signal_socket irq_socket;
+
     /*
      * Connect the device to a greenrouter.
      */
     virtual void connect(gs::gp::GenericRouter<32> *router) = 0;
+
+    /*
+     * Get the associated QEMU device.
+     */
+    DeviceState *getQEMUDevice();
+
+    /*
+     * Get the associated QEMU IRQ.
+     */
+    virtual qemu_irq getQEMUIRQ() = 0;
     protected:
     unsigned int deviceID;
     std::string deviceName;
@@ -94,6 +114,11 @@ class SCDevice:
      * The qemu device pointer is kept (for interrupt handling).
      */
     DeviceState *qemuDevice;
+
+    /*
+     * The QEMU irq.
+     */
+    qemu_irq qemuIRQ;
     private:
     static unsigned int deviceCounter;
 };

@@ -51,21 +51,27 @@ do                                                                     \
 }                                                                      \
 while(0)
 
+/*
+ * This information must be provided for registrating the device into QEMU.
+ * The SCMMIOInfo structure is defined in sc_mmio_comon.h
+ */
 SCMMIOInfo SCMMIOCounter::deviceInfo = {"sc-mmio-counter", 0x100};
 
-SCMMIOCounter::SCMMIOCounter(uint64_t baseAddress):
+SCMMIOCounter::SCMMIOCounter(uint64_t baseAddress, qemu_irq IRQ):
+
     /*
      * We must give the name of the device registered by QEMU.
      */
     SCMMIODevice("sc-mmio-counter", "sc-mmio-counter",
-                 &SCMMIOCounter::deviceInfo, baseAddress)
+                 &SCMMIOCounter::deviceInfo, baseAddress, IRQ)
 {
     DBG("sc-mmio-counter created.");
 
     /*
      * Init the variable.
      */
-    counter = 0x55;
+    counter = 0xFC;
+    irqRegister = 0x00;
 }
 
 void SCMMIOCounter::registerQEMUDevice()
@@ -126,9 +132,26 @@ int SCMMIOCounter::IPmodel(accessHandle t)
         /*
          * Just send the counter value in case of read @0x00.
          */
-        if (offset == 0x00)
+        switch (offset)
         {
-            readValue = counter;
+            case 0x00:
+                /*
+                 * Read the counter value.
+                 */
+                readValue = counter;
+            break;
+            case 0x03:
+                /*
+                 * Read the IRQ Register.
+                 */
+                readValue = irqRegister;
+            break;
+            default:
+                /*
+                 * Should not happen.
+                 */
+                readValue = 0x00;
+            break;
         }
         memcpy(data.getPointer(), &readValue, sizeof(uint8_t));
     }
@@ -144,13 +167,39 @@ int SCMMIOCounter::IPmodel(accessHandle t)
         {
             case 0x00:
                 counter++;
+                if (counter == 0x00)
+                {
+                    /*
+                     * When counter pass from 0xFF to 0x00.
+                     * Throw an interrupt.
+                     */
+                    irqRegister |= 0x01;
+                    updateIRQ();
+                }
             break;
             case 0x01:
                 counter--;
+                if (counter == 0xFF)
+                {
+                    /*
+                     * When counter pass from 0x00 to 0xFF.
+                     * Throw an interrupt.
+                     */
+                    irqRegister |= 0x02;
+                    updateIRQ();
+                }
             break;
             case 0x02:
                 counter = 0;
+                irqRegister = 0x00;
+                updateIRQ();
             break;
+            case 0x03:
+                /*
+                 * Clearing the interruption.
+                 */
+                irqRegister = 0x00;
+                updateIRQ();
             default:
                 /*
                  * Nothing.
@@ -163,4 +212,26 @@ int SCMMIOCounter::IPmodel(accessHandle t)
         DBG("???");
     }
     return 0;
+}
+
+void SCMMIOCounter::updateIRQ()
+{
+    bool irqData = false;
+    bool ackRequirement = false;
+    sc_core::sc_time time = sc_core::SC_ZERO_TIME;
+    gs_generic_signal::gs_generic_signal_payload* payload;
+
+    /*
+     * If there is a flag set, the level is high.
+     */
+    if (irqRegister != 0x00)
+    {
+        irqData = true;
+    }
+    payload = irq_socket.get_transaction();
+    payload->set_data_ptr((unsigned char*) &irqData);
+    payload->set_ack_requirement(ackRequirement);
+    irq_socket.validate_extension<IRQ>(*payload);
+    irq_socket->b_transport(*payload, time);
+    irq_socket.release_transaction(payload);    
 }

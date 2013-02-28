@@ -53,15 +53,14 @@ int sc_main(int argc, char **argv)
     std::cout << std::endl;
     /*
      * What must be done here:
-     *  -create register QEMU device.
+     *  -register QEMU devices.
      */
 
     /*
-     * Create the devices.
+     * Register the devices.
      * This create the type, and not the real device.
      * It allows instantiating the device inside QEMU.
      */
-    SCPCICounter::registerQEMUDevice();
     SCMMIOCounter::registerQEMUDevice();
 
     /*
@@ -84,48 +83,48 @@ int sc_main(int argc, char **argv)
  */
 void sc_platform_init(void)
 {
-    SCWrapper *pciWrapper = NULL;
-    //SCPCICounter *counterDevice = NULL;
-    SCMMIOCounter *anotherCounterDevice[2] = {NULL};
+    SCWrapper *wrapper = NULL;
+    SCMMIOCounter *counterDevice = NULL;
     DBG("SystemC platform init.");
 
     /*
      * Greenrouter related:
      * Protocol, Scheduler and Router are created and linked together.
      */
-    gs::gp::SimpleBusProtocol<32> *pciProtocol = 
-                           new gs::gp::SimpleBusProtocol<32>("pciProtocol", 10);
-    gs::gp::fixedPriorityScheduler *pciScheduler =
-                           new gs::gp::fixedPriorityScheduler("pciScheduler");
-    gs::gp::GenericRouter<32> *pciRouter =
-                           new gs::gp::GenericRouter<32>("pciRouter");
+    gs::gp::SimpleBusProtocol<32> *protocol = 
+                           new gs::gp::SimpleBusProtocol<32>("protocol", 10);
+    gs::gp::fixedPriorityScheduler *scheduler =
+                           new gs::gp::fixedPriorityScheduler("scheduler");
+    gs::gp::GenericRouter<32> *router =
+                           new gs::gp::GenericRouter<32>("router");
 
-    pciRouter->protocol_port(*pciProtocol);
-    pciProtocol->router_port(*pciRouter);
-    pciProtocol->scheduler_port(*pciScheduler);
+    router->protocol_port(*protocol);
+    protocol->router_port(*router);
+    protocol->scheduler_port(*scheduler);
 
     /*
-     * Create the wrapper: it's the PCI port from QEMU, the R/W come from it.
+     * Create the wrapper: It's the link between SystemC backend and QEMU.
      */
-    pciWrapper = new SCWrapper("pciWrapper", 1);
+    wrapper = new SCWrapper("wrapper", 100);
 
     /*
      * Create the devices.
      */
-    //counterDevice = new SCPCICounter();
-    anotherCounterDevice[0] = new SCMMIOCounter(0x1c180000);
-    anotherCounterDevice[1] = new SCMMIOCounter(0x1c180100);
+    counterDevice = new SCMMIOCounter(0x1c180000, SCWrapper::getQEMUIRQ(15));
 
     /*
-     * The PCI bus.
+     * Connect the SystemC bus (R/W from QEMU) to the wrapper.
      */
-    pciWrapper->pciPort(pciRouter->target_socket);
-    //counterDevice->connect(pciRouter);
-    anotherCounterDevice[0]->connect(pciRouter);
-    anotherCounterDevice[1]->connect(pciRouter);
+    wrapper->master_socket(router->target_socket);
 
     /*
-     * Direct Access to Memory (from device).
+     * Connect the SystemC bus (R/W from QEMU) to the devices.
      */
-    //counterDevice->mem_init_port(pciWrapper->memPort);
+    counterDevice->connect(router);
+
+    /*
+     * Connect the devices IRQ to the wrapper socket.
+     */
+    wrapper->plugIRQ(counterDevice);
+
 }

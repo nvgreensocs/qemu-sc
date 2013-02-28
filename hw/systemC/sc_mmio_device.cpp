@@ -58,28 +58,36 @@ std::vector<SCMMIOInfo> SCMMIODevice::devicesToBeRegistered;
 
 SCMMIODevice::SCMMIODevice(sc_core::sc_module_name name,
                            std::string deviceName, SCMMIOInfo *deviceInfo,
-                           uint64_t baseAddress):
+                           uint64_t baseAddress,
+                           qemu_irq IRQ):
     SCDevice(name, deviceName)
 {
     this->deviceName = deviceName;
     this->mmioDeviceInfo = deviceInfo;
 
-    qemuDevice = qdev_create(NULL, deviceName.c_str());
-    qdev_init(qemuDevice);
-
-    sysbus_mmio_map(sysbus_from_qdev(qemuDevice), 0, baseAddress);
-
     /*
-     * Will see that later.
-     * sysbus_connect_irq(s, 0, irq);
+     * Create a sysbus device called deviceName into QEMU.
      */
-
-    DBG("device created: " << deviceName);
+    qemuDevice = sysbus_create_varargs(deviceName.c_str(), baseAddress, IRQ,
+                                                                        NULL);
+    DBG("device created: " << deviceName << "@" << baseAddress);
 
     /*
      * Keep the pointer for interrupt handling.
      */
     this->qemuDevice = qemuDevice;
+
+    /*
+     * Keep the pointer to IRQ.
+     */
+    if (IRQ != NULL)
+    {
+        this->qemuIRQ = get_mmio_irq(qemuDevice);
+    }
+    else
+    {
+        this->qemuIRQ = NULL;
+    }
 
     /*
      * Target Socket configuration.
@@ -103,26 +111,6 @@ void SCMMIODevice::parseGSParam()
     /*
      * To be defined later.
      */
-}
-
-/*
- * Device must be registered in QEMU by sc_mmio.
- * This is linked with sc_mmio abstract device.
- */
-void SCMMIODevice::registerQEMUDevice()
-{
-    /*
-     * Fill the scMMIODeviceToBeRegistered vector.
-     */
-    DBG("device to be registered: " << deviceName);
-    SCMMIOInfo deviceInfo;
-    if (deviceName.length() > 63)
-    {
-        WRN("Device name exceeds 63 characters.");
-    }
-    strncpy(deviceInfo.name, deviceName.c_str(), 64);
-    deviceInfo.name[63] = '\0';
-    devicesToBeRegistered.push_back(deviceInfo);
 }
 
 /*
@@ -157,4 +145,9 @@ SCMMIOInfo *getMMIODeviceInfo()
 unsigned int getMMIODeviceCounter(void)
 {
     return SCMMIODevice::getMMIODeviceCounter();
+}
+
+qemu_irq SCMMIODevice::getQEMUIRQ()
+{
+    return get_mmio_irq(qemuDevice);
 }

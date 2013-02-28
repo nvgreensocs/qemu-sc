@@ -139,7 +139,7 @@ void SCPCIDevice::setTLMAddress(DeviceState *dev, uint8_t bar, hwaddr addr)
         if (instanciatedDevices[i]->qemuDevice == dev)
         {
             /*
-             * We found it just write the TLM Address and refresh the router
+             * We found it: just write the TLM Address and refresh the router
              * Address map.
              */
             instanciatedDevices[i]->target_port.base_addr = addr;

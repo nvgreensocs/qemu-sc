@@ -35,6 +35,20 @@ do { printf("sc_mmio.c: " fmt , ## __VA_ARGS__); } while (0)
 #define DPRINTF(fmt, ...) do { } while (0)
 #endif
 
+/*
+ * Return the QEMU IRQ for a given device.
+ * Called in sc_mmio_device.cpp to keep the IRQ pointer.
+ * Then the IRQ can be Raised/Lowed in the wrapper code.
+ */
+qemu_irq get_mmio_irq(DeviceState *dev)
+{
+    SCMMIOState *sc_dev = SC_MMIO(dev);
+    return sc_dev->irq;
+}
+
+/*
+ * Callback for read/write to a MMIO address space.
+ */
 static uint64_t mmio_read(void *opaque, hwaddr addr, unsigned size)
 {
     SysBusDevice *dev = opaque;
@@ -77,6 +91,7 @@ static int sc_mmio_init(SysBusDevice *bus_dev)
                           info[dev->deviceType].size);
 
     sysbus_init_mmio(bus_dev, &dev->mmio);
+    sysbus_init_irq(bus_dev, &dev->irq);
     return 0;
 }
 
