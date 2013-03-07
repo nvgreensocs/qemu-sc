@@ -23,6 +23,8 @@
 #define VERSATILE_FLASH_SIZE (64 * 1024 * 1024)
 #define VERSATILE_FLASH_SECT_SIZE (256 * 1024)
 
+void export_irq(qemu_irq *pic, unsigned int count);
+
 /* Primary interrupt controller.  */
 
 typedef struct vpb_sic_state
@@ -335,6 +337,11 @@ static void versatile_init(QEMUMachineInitArgs *args, int board_id)
                           4, 0x0089, 0x0018, 0x0000, 0x0, 0)) {
         fprintf(stderr, "qemu: Error registering flash memory.\n");
     }
+
+    /*
+     * Export IRQ to SystemC.
+     */
+    export_irq(pic, 32);
 
     versatile_binfo.ram_size = args->ram_size;
     versatile_binfo.kernel_filename = args->kernel_filename;
