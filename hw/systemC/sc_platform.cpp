@@ -110,7 +110,7 @@ void sc_platform_init(void)
     /*
      * Create the devices.
      */
-    counterDevice = new SCMMIOCounter(0x1c180000, SCWrapper::getQEMUIRQ(15));
+    counterDevice = new SCMMIOCounter(0x101e6000, SCWrapper::getQEMUIRQ(15));
 
     /*
      * Connect the SystemC bus (R/W from QEMU) to the wrapper.
