@@ -193,9 +193,9 @@ int64_t sc_simulation(int64_t qemu_time)
 
 	if (quantumKeeper->need_sync())
     {
-		vm_stop(RUN_STATE_PAUSED);
+		//vm_stop(RUN_STATE_PAUSED);
 		quantumKeeper->sync();
-		vm_start();
+		//vm_start();
 	}
 
     /*DBG("NEXT SYNCHRO: " << next.value());*/
