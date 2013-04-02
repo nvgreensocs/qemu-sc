@@ -24,11 +24,15 @@
 
 #include "sc_platform.h"
 #include "sc_mmio_counter.h"
-#include "sc_pci_counter.h"
 #include "sc_wrapper.h"
 #include <iostream>
 #include <string>
 #include <systemc>
+
+/*
+ * GreenConfig.
+ */
+#include "greencontrol/config.h"
 
 /*
  * Greenrouter.
@@ -88,6 +92,17 @@ void sc_platform_init(void)
     DBG("SystemC platform init.");
 
     /*
+     * GreenControl Core instance
+     */
+    gs::ctr::GC_Core core;
+
+    /*
+     * GreenConfig Plugin
+     */
+    gs::cnf::ConfigDatabase cnfdatabase("ConfigDatabase");
+    gs::cnf::ConfigPlugin configPlugin(&cnfdatabase);
+
+    /*
      * Greenrouter related:
      * Protocol, Scheduler and Router are created and linked together.
      */
@@ -111,7 +126,6 @@ void sc_platform_init(void)
      * Create the devices.
      */
     counterDevice = new SCMMIOCounter(0x101e6000, SCWrapper::getQEMUIRQ(15));
-
     /*
      * Connect the SystemC bus (R/W from QEMU) to the wrapper.
      */

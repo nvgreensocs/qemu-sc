@@ -59,8 +59,9 @@ std::vector<SCMMIOInfo> SCMMIODevice::devicesToBeRegistered;
 SCMMIODevice::SCMMIODevice(sc_core::sc_module_name name,
                            std::string deviceName, SCMMIOInfo *deviceInfo,
                            uint64_t baseAddress,
-                           qemu_irq IRQ):
-    SCDevice(name, deviceName)
+                           qemu_irq IRQ,
+                           unsigned int nRegister):
+    SCDevice(name, deviceName, nRegister)
 {
     this->deviceName = deviceName;
     this->mmioDeviceInfo = deviceInfo;
@@ -94,8 +95,7 @@ SCMMIODevice::SCMMIODevice(sc_core::sc_module_name name,
      */
     target_port.base_addr = baseAddress;
     target_port.high_addr = baseAddress + mmioDeviceInfo->size - 1;
-    target_port.bind_b_if(*this);
-    target_port.peq.out_port(*this);
+    target_port.setAddress(baseAddress, baseAddress + mmioDeviceInfo->size - 1);
 }
 
 SCMMIODevice::~SCMMIODevice()

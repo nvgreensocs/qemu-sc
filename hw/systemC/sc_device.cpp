@@ -26,14 +26,17 @@
 
 unsigned int SCDevice::deviceCounter = 0;
 
-SCDevice::SCDevice(sc_core::sc_module_name name, std::string deviceName):
-    sc_core::sc_module(name),
-    target_port("target_port"),
+SCDevice::SCDevice(sc_core::sc_module_name name, std::string deviceName,
+                   unsigned int nRegister):
+    /*
+     * TODO: Fix that, we should be able to init without specifying an address.
+     */
+    gr_device(name, gs::reg::INDEXED_ADDRESS, nRegister, NULL),
+    target_port("target_port", r, 0x00, 0x01),
     irq_socket("master_socket")
 {
     this->deviceName = deviceName;
     deviceID = deviceCounter++;
-
     /*
      * Interrupt configuration.
      */

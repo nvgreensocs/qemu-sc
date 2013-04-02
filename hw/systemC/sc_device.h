@@ -37,6 +37,9 @@
 #include "gsgpsocket/transport/GSGPMasterBlockingSocket.h"
 #include "greenrouter/genericRouter.h"
 
+#include <greenreg/greenreg.h>
+#include <greenreg/greenreg_socket.h>
+
 /*
  * For interruption socket.
  */
@@ -68,13 +71,11 @@ extern "C"
  */
 
 class SCDevice:
-    public sc_core::sc_module,
-    public gs::tlm_b_if<gs::gp::GenericSlaveAccessHandle>,
-    //public gs::payload_event_queue_output_if<gs::gp::master_atom>,
-    public gs::payload_event_queue_output_if<gs::gp::slave_atom>
+    public gs::reg::gr_device
 {
     public:
-    SCDevice(sc_core::sc_module_name name, std::string deviceName);
+    SCDevice(sc_core::sc_module_name name, std::string deviceName,
+             unsigned int nRegister = 0);
     virtual void parseGSParam() = 0;
     std::string getDeviceName();
     unsigned int getDeviceID();
@@ -83,9 +84,7 @@ class SCDevice:
      * Target port for the devices:
      * Usually connected on a greenrouter.
      */
-	gs::gp::GenericSlavePort<32> target_port;
-    typedef gs::gp::GenericSlavePort<32>::accessHandle accessHandle;
-    typedef gs::gp::GenericSlavePort<32>::phase phase;
+	gs::reg::greenreg_socket< gs::gp::generic_slave> target_port;
 
 	/*
      * Socket for interruption.
