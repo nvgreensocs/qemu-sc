@@ -3744,6 +3744,11 @@ fi
 if test "$systemc_wrapper" = "yes" ; then
   echo "CONFIG_SYSTEMC_WRAPPER=y" >> $config_host_mak
   echo "GREENSOCS_INCLUDE=$gsdir/include" >> $config_host_mak
+  if [ ! -e $gsdir/lib64/libgreenreg.a ]; then
+    echo "GREENSOCS_LIB=$gsdir/lib" >> $config_host_mak
+  else
+    echo "GREENSOCS_LIB=$gsdir/lib64" >> $config_host_mak
+  fi
   echo "SYSTEMC_INCLUDE=$syscdir/include" >> $config_host_mak
   if [ ! -e $syscdir/lib-linux/libsystemc.a ]; then
     echo "SYSTEMC_LIB=$syscdir/lib-linux64" >> $config_host_mak

@@ -60,7 +60,7 @@ class SCMMIODevice : public SCDevice
 public:
     SCMMIODevice(sc_core::sc_module_name name, std::string deviceName,
                  SCMMIOInfo *deviceInfo, uint64_t baseAddress,
-                 qemu_irq IRQ = NULL);
+                 qemu_irq IRQ = NULL, unsigned int nRegister = 0);
     ~SCMMIODevice();
     void parseGSParam();
     static SCMMIOInfo *getMMIODeviceInfo();

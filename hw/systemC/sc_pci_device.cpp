@@ -93,12 +93,6 @@ SCPCIDevice::SCPCIDevice(sc_core::sc_module_name name,
      */
     this->qemuDevice = qemuDevice;
     instanciatedDevices.push_back(this);
-
-    /*
-     * PCI Socket configuration.
-     */
-	target_port.bind_b_if(*this);
-	target_port.peq.out_port(*this);
 }
 
 SCPCIDevice::~SCPCIDevice()

@@ -28,11 +28,7 @@
 #include <iostream>
 #include <systemc>
 #include "sc_mmio_device.h"
-
-/*
- * This is needed for Slave Socket.
- */
-#include "gsgpsocket/transport/GSGPSlaveSocket.h"
+#include "greencontrol/config.h"
 
 /*
  * This is needed for interruption.
@@ -47,43 +43,40 @@ class SCMMIOCounter:
     public SCMMIODevice
 {
     public:
+    GC_HAS_CALLBACKS();
     SC_HAS_PROCESS(SCMMIOCounter);
     SCMMIOCounter(uint64_t baseAddress, qemu_irq IRQ);
+    ~SCMMIOCounter();
 
     /*
      * Info needed by QEMU.
      */
     static SCMMIOInfo deviceInfo;
     static void registerQEMUDevice();
+    
+    /*
+     * Needed by GreenReg.
+     */
+    void end_of_elaboration();
 
     /*
-     * Transaction for GenericSlaveAccessHandle.
+     * IP Modeling.
      */
-    void b_transact(gs::gp::GenericSlaveAccessHandle gp);
+    
+    /*
+     * GreenSocs Parameters.
+     */
+    gs::gs_param<unsigned char> counter;
+    gs::gs_param<unsigned char> irqRegister;
 
     /*
-     * Notification from payload_event_queue_output_if.
+     * Callbacks.
      */
-    void notify(gs::gp::master_atom& tc);
-    void notify(gs::gp::slave_atom& tc);
-
-    /*
-     * IP variables.
-     */
-
-    /*
-     * Counter value.
-     */
-    uint8_t counter;
-
-    /*
-     * IRQ Register.
-     * 2^1: 0xFF -> 0x00 overflow occurs.
-     * 2^2: 0x00 -> 0xFF overflow occurs.
-     */
-    uint8_t irqRegister;
-
-    int IPmodel(accessHandle t);
+    void incrementCounter();
+    void preReadCounter();
+    void decrementCounter();
+    void resetCounter();
+    void clearIRQ();
     void updateIRQ();
 };
 

@@ -30,7 +30,7 @@
 #define DBG(str)                                                       \
 do                                                                     \
 {                                                                      \
-    std::cout << "sc_mmio_counter.cpp: debug: " << str << std::endl;    \
+    std::cout << "sc_mmio_counter.cpp: debug: " << str << std::endl;   \
 }                                                                      \
 while(0)
 #else
@@ -63,15 +63,97 @@ SCMMIOCounter::SCMMIOCounter(uint64_t baseAddress, qemu_irq IRQ):
      * We must give the name of the device registered by QEMU.
      */
     SCMMIODevice("sc-mmio-counter", "sc-mmio-counter",
-                 &SCMMIOCounter::deviceInfo, baseAddress, IRQ)
+                 &SCMMIOCounter::deviceInfo, baseAddress, IRQ, 4),
+    /*
+     * Init the gs_param.
+     */
+    counter("counter", (unsigned char)(0xFC)),
+    irqRegister("irq register", (unsigned char)(0x00))
 {
     DBG("sc-mmio-counter created.");
 
     /*
-     * Init the variable.
+     * GreenReg.
      */
-    counter = 0xFC;
-    irqRegister = 0x00;
+    r.create_register("Reg0",
+                      "Increment or get value",
+                      0x00,
+                      gs::reg::STANDARD_REG
+                      | gs::reg::SINGLE_IO
+                      | gs::reg::SINGLE_BUFFER
+                      | gs::reg::FULL_WIDTH,
+                      0x00,
+                      0x00,
+                      8,
+                      0x00);
+    r.create_register("Reg1",
+                      "Decrement",
+                      0x01,
+                      gs::reg::STANDARD_REG
+                      | gs::reg::SINGLE_IO
+                      | gs::reg::SINGLE_BUFFER
+                      | gs::reg::FULL_WIDTH,
+                      0x00,
+                      0x00,
+                      8,
+                      0x00);
+    r.create_register("Reg2",
+                      "Reset",
+                      0x02,
+                      gs::reg::STANDARD_REG
+                      | gs::reg::SINGLE_IO
+                      | gs::reg::SINGLE_BUFFER
+                      | gs::reg::FULL_WIDTH,
+                      0x00,
+                      0x00,
+                      8,
+                      0x00);
+    r.create_register("Reg3",
+                      "Interrupt register",
+                      0x03,
+                      gs::reg::STANDARD_REG
+                      | gs::reg::SINGLE_IO
+                      | gs::reg::SINGLE_BUFFER
+                      | gs::reg::FULL_WIDTH,
+                      0x00,
+                      0x00,
+                      8,
+                      0x00);
+}
+
+SCMMIOCounter::~SCMMIOCounter()
+{
+    GC_UNREGISTER_CALLBACKS();
+}
+
+/*
+ * Called by GreenReg at the end of elaboration.
+ */
+void SCMMIOCounter::end_of_elaboration()
+{
+    /*
+     * Define the callback for each register.
+     */
+    GR_FUNCTION(SCMMIOCounter, incrementCounter);
+    GR_SENSITIVE(r[0x00].add_rule(gs::reg::PRE_WRITE,
+                                   "increment counter",
+                                   gs::reg::NOTIFY));
+    GR_FUNCTION(SCMMIOCounter, preReadCounter);
+    GR_SENSITIVE(r[0x00].add_rule(gs::reg::PRE_READ,
+                                   "read counter",
+                                   gs::reg::NOTIFY));
+    GR_FUNCTION(SCMMIOCounter, decrementCounter);
+    GR_SENSITIVE(r[0x01].add_rule(gs::reg::POST_WRITE,
+                                   "decrement counter",
+                                   gs::reg::NOTIFY));
+    GR_FUNCTION(SCMMIOCounter, resetCounter);
+    GR_SENSITIVE(r[0x02].add_rule(gs::reg::POST_WRITE,
+                                   "reset counter",
+                                   gs::reg::NOTIFY));
+    GR_FUNCTION(SCMMIOCounter, clearIRQ);
+    GR_SENSITIVE(r[0x03].add_rule(gs::reg::POST_WRITE,
+                                   "clear interrupt register",
+                                   gs::reg::NOTIFY));
 }
 
 void SCMMIOCounter::registerQEMUDevice()
@@ -84,134 +166,67 @@ void SCMMIOCounter::registerQEMUDevice()
 }
 
 /*
- * Transaction for GenericSlavePort.
- */
-void SCMMIOCounter::b_transact(gs::gp::GenericSlaveAccessHandle t)
-{
-    /*
-     * We don't care about timing.
-     */
-	IPmodel(_getSlaveAccessHandle(t));
-}
-
-void SCMMIOCounter::notify(gs::gp::master_atom& tc)
-{
-	DBG("Master notify.");
-}
-
-void SCMMIOCounter::notify(gs::gp::slave_atom& tc)
-{
-	DBG("Slave notify.");
-}
-
-/*
  * IPModeling.
  */
-int SCMMIOCounter::IPmodel(accessHandle t)
+
+void SCMMIOCounter::incrementCounter()
 {
     /*
-     * Data for the transaction.
+     * We don't care what is written to this register..
      */
-	gs::GSDataType data;
-	data.set(t->getMData());
+    counter = counter + 1;
 
-    /*
-     * Actual address of the transaction.
-     */
-    uint32_t offset = t->getMAddr() - target_port.base_addr;
-
-    /*
-     * Return value.
-     */
-    uint32_t readValue = 0;
-    
-    if (t->getMCmd() == gs::Generic_MCMD_RD)
+    if (counter == 0x00)
     {
-        DBG("Attempt to read @" << offset);
-
         /*
-         * Just send the counter value in case of read @0x00.
+         * When counter pass from 0xFF to 0x00.
+         * Throw an interrupt.
          */
-        switch (offset)
-        {
-            case 0x00:
-                /*
-                 * Read the counter value.
-                 */
-                readValue = counter;
-            break;
-            case 0x03:
-                /*
-                 * Read the IRQ Register.
-                 */
-                readValue = irqRegister;
-            break;
-            default:
-                /*
-                 * Should not happen.
-                 */
-                readValue = 0x00;
-            break;
-        }
-        memcpy(data.getPointer(), &readValue, sizeof(uint8_t));
+        irqRegister |= 0x01;
+        updateIRQ();
     }
-    else if (t->getMCmd() == gs::Generic_MCMD_WR)
-    {
-        DBG("Attempt to write @" << offset);
+}
 
-        /*
-         * Just increment counter in case of write @0x01, and reset it in
-         * case of write @0x02.
-         */
-        switch (offset)
-        {
-            case 0x00:
-                counter++;
-                if (counter == 0x00)
-                {
-                    /*
-                     * When counter pass from 0xFF to 0x00.
-                     * Throw an interrupt.
-                     */
-                    irqRegister |= 0x01;
-                    updateIRQ();
-                }
-            break;
-            case 0x01:
-                counter--;
-                if (counter == 0xFF)
-                {
-                    /*
-                     * When counter pass from 0x00 to 0xFF.
-                     * Throw an interrupt.
-                     */
-                    irqRegister |= 0x02;
-                    updateIRQ();
-                }
-            break;
-            case 0x02:
-                counter = 0;
-                irqRegister = 0x00;
-                updateIRQ();
-            break;
-            case 0x03:
-                /*
-                 * Clearing the interruption.
-                 */
-                irqRegister = 0x00;
-                updateIRQ();
-            default:
-                /*
-                 * Nothing.
-                 */
-            break;
-        }
-    }
-    else
+void SCMMIOCounter::preReadCounter()
+{
+    /*
+     * Fill the buffer with the counter value.
+     */
+    r[0x00] = counter;
+}
+
+void SCMMIOCounter::decrementCounter()
+{
+    counter -= 1;
+
+    if (counter == 0xFF)
     {
-        DBG("???");
+        /*
+         * When counter pass from 0x00 to 0xFF.
+         * Throw an interrupt.
+         */
+        irqRegister |= 0x02;
+        updateIRQ();
     }
-    return 0;
+}
+
+void SCMMIOCounter::resetCounter()
+{
+    /*
+     * Reset the IP.
+     */
+    counter = 0;
+    irqRegister = 0;
+    updateIRQ();
+}
+
+void SCMMIOCounter::clearIRQ()
+{
+    /*
+     * Clearing the interruption.
+     */
+    irqRegister = 0x00;
+    updateIRQ();
 }
 
 void SCMMIOCounter::updateIRQ()

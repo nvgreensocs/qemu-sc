@@ -5,7 +5,6 @@ common-obj-y += sc_pci_device.o
 common-obj-y += sc_mmio_device.o
 common-obj-y += sc_wrapper.o
 common-obj-y += sc_platform.o
-common-obj-y += sc_pci_counter.o
 common-obj-y += sc_mmio_counter.o
 
 # Special rule for systemC file.
