@@ -290,6 +290,8 @@ static void versatile_init(QEMUMachineInitArgs *args, int board_id)
     sysbus_mmio_map(SYS_BUS_DEVICE(pl041), 0, 0x10004000);
     sysbus_connect_irq(SYS_BUS_DEVICE(pl041), 0, sic[24]);
 
+    sysbus_create_simple("virtio-mmio", 0x101e7000, pic[18]);
+
     /* Memory map for Versatile/PB:  */
     /* 0x10000000 System registers.  */
     /* 0x10001000 PCI controller config registers.  */
